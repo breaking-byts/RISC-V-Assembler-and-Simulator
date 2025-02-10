@@ -1,13 +1,11 @@
 class Assembler:
     def __init__(self):
-        #instruction_types
         self.R_TYPE = 0
         self.I_TYPE = 1
         self.S_TYPE = 2
         self.B_TYPE = 3
         self.U_TYPE=  4
         self.J_TYPE = 5
-
         self.opcodes = {
             'sw':     '0100011',
             'beq':    '1100011',
@@ -29,5 +27,6 @@ class Assembler:
             'halt': '000',
             'rvrs': '000'
         }
+        self.a=2
 
 
