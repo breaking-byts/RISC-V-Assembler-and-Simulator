@@ -130,61 +130,73 @@ class Assembler:
         self.program_memory = [0] * 64
         self.stack_memory = [0] * 32
         self.data_memory = [0] * 32
+
     def text_parser(self, text):
         lines = text.split('\n')
         self.labels = {}
-        self.current_address = 0
+        self.current_address= 0
         self.instructions = []
         has_halt = False
-        line_num=1
+        line_num = 1
+
         for line in lines:
-            line=line.strip()
+            line = line.strip()
             if not line:
-                line_num+=1
+                line_num += 1
                 continue
+
+            # Handle labels
             if ':' in line:
                 label_parts = line.split(':')
                 label = label_parts[0].strip()
 
                 if not label[0].isalpha():
-                   raise SyntaxError(f"Line {line_num}: Label must start with an alphabet")
+                    raise SyntaxError(f"Line {line_num}: Label must start with an alphabet")
                 if " " in label:
                     raise SyntaxError(f"Line {line_num}: Label must not contain any spaces")
                 if label in self.labels:
                     raise SyntaxError(f"Line {line_num}: Label {label} is duplicate")
+
                 self.labels[label] = self.current_address
                 line = label_parts[1].strip()
                 if not line:
-                    line_num+=1
-                    continue
-                parts = line.split()
-                if not parts:
                     line_num += 1
                     continue
-                opcode = self.opcodes.get(parts[0])
-                if opcode is None:
-                    raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
-                if parts[0] == 'beq' and len(parts) == 4:
-                    if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
-                        has_halt = True
-                        if self.current_address != len(self.instructions) * 4:
-                            raise SyntaxError("Virtual Halt must be the last instruction")
-                for reg in parts[1:]:
-                    if reg in self.abi_registers:
-                        continue
-                    if '0x' in reg:
-                        try:
-                            imm = int(reg, 16)
-                            if imm >0x7FF or imm <-0x800:
-                                raise SyntaxError(f"Line {line_num}: Immediate value out of range: {reg}")
-                        except ValueError:
-                            raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
-                self.instructions.append((parts, self.current_address))
-                self.current_address += 4
+
+            # Process instruction
+            parts = line.split()
+            if not parts:
                 line_num += 1
-                if not has_halt:
-                    raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
+                continue
 
+            opcode = self.opcodes.get(parts[0])
+            if opcode is None:
+                raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
 
-        return text
+            # Check for halt instruction
+            if parts[0] == 'beq' and len(parts) == 4:
+                if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
+                    has_halt = True
+                    if self.current_address != len(self.instructions) * 4:
+                        raise SyntaxError("Virtual Halt must be the last instruction")
 
+            # Validate registers and immediates
+            for reg in parts[1:]:
+                if reg in self.abi_registers:
+                    continue
+                if '0x' in reg:
+                    try:
+                        imm = int(reg, 16)
+                        if imm > 0x7FF or imm < -0x800:
+                            raise SyntaxError(f"Line {line_num}: Immediate value out of range: {reg}")
+                    except ValueError:
+                        raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
+
+            self.instructions.append((parts, self.current_address))
+            self.current_address += 4
+            line_num += 1
+
+        if not has_halt:
+            raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
+
+        return self.instructions
