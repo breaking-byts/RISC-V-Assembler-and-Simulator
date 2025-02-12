@@ -177,7 +177,6 @@ class Assembler:
                     if opcode is None:
                         raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
 
-                    # Check for halt instruction
                     if parts[0] == 'beq' and len(parts) == 4:
                         if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
                             has_halt = True
@@ -248,5 +247,6 @@ class Assembler:
                 raise ValueError(f"Undefined label: {label}")
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 20, signed=True)
+
 
 
