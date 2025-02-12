@@ -37,7 +37,6 @@ class Assembler:
             'beq': '000',
             'bne': '001',
             'blt': '100',
-            'addi': '000',
             'rst': '000',
             'halt': '000',
             'rvrs': '000',
@@ -131,72 +130,123 @@ class Assembler:
         self.stack_memory = [0] * 32
         self.data_memory = [0] * 32
 
-    def text_parser(self, text):
-        lines = text.split('\n')
+    def text_parser(self, file_name):
         self.labels = {}
-        self.current_address= 0
+        self.current_address = 0
         self.instructions = []
         has_halt = False
-        line_num = 1
 
-        for line in lines:
-            line = line.strip()
-            if not line:
-                line_num += 1
-                continue
+        try:
+            with open(file_name, 'r') as file:
+                text = file.read()
+                lines = text.split('\n')
+                line_num = 1
 
-            # Handle labels
-            if ':' in line:
-                label_parts = line.split(':')
-                label = label_parts[0].strip()
+                for line in lines:
+                    # Remove comments and whitespace
+                    line = line.split('#')[0].strip()
+                    if not line:
+                        line_num += 1
+                        continue
 
-                if not label[0].isalpha():
-                    raise SyntaxError(f"Line {line_num}: Label must start with an alphabet")
-                if " " in label:
-                    raise SyntaxError(f"Line {line_num}: Label must not contain any spaces")
-                if label in self.labels:
-                    raise SyntaxError(f"Line {line_num}: Label {label} is duplicate")
+                    # Handle labels
+                    if ':' in line:
+                        label_parts = line.split(':')
+                        label = label_parts[0].strip()
 
-                self.labels[label] = self.current_address
-                line = label_parts[1].strip()
-                if not line:
+                        if not label[0].isalpha():
+                            raise SyntaxError(f"Line {line_num}: Label must start with an alphabet")
+                        if " " in label:
+                            raise SyntaxError(f"Line {line_num}: Label must not contain any spaces")
+                        if label in self.labels:
+                            raise SyntaxError(f"Line {line_num}: Label {label} is duplicate")
+
+                        self.labels[label] = self.current_address
+                        line = label_parts[1].strip()
+                        if not line:
+                            line_num += 1
+                            continue
+
+                    # Process instruction
+                    parts = line.split()
+                    if not parts:
+                        line_num += 1
+                        continue
+
+                    opcode = self.opcodes.get(parts[0])
+                    if opcode is None:
+                        raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
+
+                    # Check for halt instruction
+                    if parts[0] == 'beq' and len(parts) == 4:
+                        if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
+                            has_halt = True
+                            if self.current_address != len(self.instructions) * 4:
+                                raise SyntaxError("Virtual Halt must be the last instruction")
+
+                    # Validate registers and immediates
+                    for reg in parts[1:]:
+                        if reg in self.abi_registers:
+                            continue
+                        if '0x' in reg:
+                            try:
+                                imm = int(reg, 16)
+                                if imm > 0x7FF or imm < -0x800:
+                                    raise SyntaxError(f"Line {line_num}: Immediate value out of range: {reg}")
+                            except ValueError:
+                                raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
+
+                    self.instructions.append((parts, self.current_address))
+                    self.current_address += 4
                     line_num += 1
-                    continue
 
-            # Process instruction
-            parts = line.split()
-            if not parts:
-                line_num += 1
-                continue
+                if not has_halt:
+                    raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
 
-            opcode = self.opcodes.get(parts[0])
-            if opcode is None:
-                raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
+                return self.instructions
 
-            # Check for halt instruction
-            if parts[0] == 'beq' and len(parts) == 4:
-                if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
-                    has_halt = True
-                    if self.current_address != len(self.instructions) * 4:
-                        raise SyntaxError("Virtual Halt must be the last instruction")
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Assembly file not found: {file_name}")
+        except IOError:
+            raise IOError(f"Error reading file: {file_name}")
 
-            # Validate registers and immediates
-            for reg in parts[1:]:
-                if reg in self.abi_registers:
-                    continue
-                if '0x' in reg:
-                    try:
-                        imm = int(reg, 16)
-                        if imm > 0x7FF or imm < -0x800:
-                            raise SyntaxError(f"Line {line_num}: Immediate value out of range: {reg}")
-                    except ValueError:
-                        raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
+        def reg_to_binary(self, reg):
+            if reg in self.abi_registers:
+                reg = self.abi_registers[reg]
 
-            self.instructions.append((parts, self.current_address))
-            self.current_address += 4
-            line_num += 1
+            if reg in self.registers:
+                return self.registers[reg]
+            else:
+                raise ValueError(f"Invalid register: {reg}")
 
-        if not has_halt:
-            raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
+        def get_immediate_binary(self, imm_str, bits, signed=True):
+            try:
+                if '0x' in imm_str:
+                    imm = int(imm_str, 16)
+                else:
+                    imm = int(imm_str)
+                max_val = (2 ** (bits - 1)) - 1 if signed else (2 ** bits) - 1
+                min_val = -(2 ** (bits - 1)) if signed else 0
+                if imm > max_val or imm < min_val:
+                    raise ValueError(f"Immediate value {imm} out of range for {bits} bits")
 
-        return self.instructions
+                if imm < 0:
+                    imm = (2 ** bits) + imm
+
+                return format(imm % (2 ** bits), f'0{bits}b')
+            except ValueError:
+                raise ValueError(f"Invalid immediate value: {imm_str}")
+
+        def get_branch_offset(self, label, current_address):
+            if label not in self.labels:
+                raise ValueError(f"Undefined label: {label}")
+            offset = self.labels[label] - current_address
+            return self.get_immediate_binary(str(offset), 12, signed=True)
+
+        def get_jump_offset(self, label, current_address):
+            if label not in self.labels:
+                raise ValueError(f"Undefined label: {label}")
+            offset = self.labels[label] - current_address
+            return self.get_immediate_binary(str(offset), 20, signed=True)
+
+
