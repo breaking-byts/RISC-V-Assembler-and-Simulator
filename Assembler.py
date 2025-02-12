@@ -152,7 +152,7 @@ class Assembler:
                     raise SyntaxError(f"Line {line_num}: Label must not contain any spaces")
                 if label in self.labels:
                     raise SyntaxError(f"Line {line_num}: Label {label} is duplicate")
-                self.labels[label] = len(self.current_address)
+                self.labels[label] = self.current_address
                 line = label_parts[1].strip()
                 if not line:
                     line_num+=1
