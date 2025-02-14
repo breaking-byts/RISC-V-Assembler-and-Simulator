@@ -274,6 +274,7 @@ class Assembler:
                 func7 = '0000000'
             binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
             return binary
+        def teat(self):
 
 
 
