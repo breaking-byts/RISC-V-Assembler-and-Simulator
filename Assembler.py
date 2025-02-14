@@ -44,12 +44,6 @@ class Assembler:
             'addi': '000',
             'jalr': '000'
         }
-        self.func7={
-            'jal': '0000000',
-            'rst': '0000000',
-            'halt': '0000000',
-            'rvrs': '0000000'
-        }
         self.registers = {
             'x0': '00000',
             'x1': '00001',
@@ -209,7 +203,7 @@ class Assembler:
         except IOError:
             raise IOError(f"Error reading file: {file_name}")
 
-        def reg_to_binary(self, reg):
+    def reg_to_binary(self, reg):
             if reg in self.abi_registers:
                 reg = self.abi_registers[reg]
 
@@ -218,7 +212,7 @@ class Assembler:
             else:
                 raise ValueError(f"Invalid register: {reg}")
 
-        def get_immediate_binary(self, imm_str, bits, signed=True):
+    def get_immediate_binary(self, imm_str, bits, signed=True):
             try:
                 if '0x' in imm_str:
                     imm = int(imm_str, 16)
@@ -236,17 +230,50 @@ class Assembler:
             except ValueError:
                 raise ValueError(f"Invalid immediate value: {imm_str}")
 
-        def get_branch_offset(self, label, current_address):
+    def get_branch_offset(self, label, current_address):
             if label not in self.labels:
                 raise ValueError(f"Undefined label: {label}")
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 12, signed=True)
 
-        def get_jump_offset(self, label, current_address):
+    def get_jump_offset(self, label, current_address):
             if label not in self.labels:
                 raise ValueError(f"Undefined label: {label}")
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 20, signed=True)
+    def I_type(self,instruction):
+            if len(instruction) != 4:
+                raise SyntaxError(f"Invalid number of arguments for I-type instruction: {instruction}")
+            opcode = self.opcodes[instruction[0]]
+            rd= self.reg_to_binary(instruction[1])
+            rs1= self.reg_to_binary(instruction[2])
+            imm= self.get_immediate_binary(instruction[3], 12)
+            if "0x" in imm:
+                imm=self.get_immediate_binary(imm, 12)
+            else:
+                format
+                if '(' in imm and ')' in imm:
+                    offset = imm.split('(')[0]
+                    imm = self.get_immediate_binary(offset, 12)
+                else:
+                    imm = self.get_immediate_binary(imm, 12)
+            func3 = self.func3[instruction[0]]
+            binary = f"{imm}{rs1}{func3}{rd}{opcode}"
+            return binary
+        def R_type(self,instruction):
+            if len(instruction) != 4:
+                raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
+            opcode = self.opcodes[instruction[0]]
+            rd = self.reg_to_binary(instruction[1])
+            rs1 = self.reg_to_binary(instruction[2])
+            rs2 = self.reg_to_binary(instruction[3])
+            func3 = self.func3[instruction[0]]
+            if instruction[0] == 'sub':
+                func7 = '0100000'
+            else:
+                func7 = '0000000'
+            binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
+            return binary
 
 
 
