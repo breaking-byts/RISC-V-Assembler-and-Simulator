@@ -260,7 +260,7 @@ class Assembler:
             func3 = self.func3[instruction[0]]
             binary = f"{imm}{rs1}{func3}{rd}{opcode}"
             return binary
-        def R_type(self,instruction):
+    def R_type(self,instruction):
             if len(instruction) != 4:
                 raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
             opcode = self.opcodes[instruction[0]]
