@@ -245,3 +245,23 @@ class Assembler:
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 20, signed=True)
 
+    def S_type(self, instruction):
+        if len(instruction) != 3:
+            raise SyntaxError(f"Invalid number of arguments for S-type instruction: {instruction}")
+        opcode = self.opcodes[instruction[0]]
+        rs2 = self.reg_to_binary(instruction[1])
+        mem_addr = instruction[2]
+        if '(' not in mem_addr or ')' not in mem_addr:
+            raise SyntaxError(f"Invalid memory address format: {mem_addr}")
+
+        offset = mem_addr[:mem_addr.find('(')]
+        rs1 = mem_addr[mem_addr.find('(') + 1:mem_addr.find(')')]
+        rs1 = self.reg_to_binary(rs1)
+        imm = self.get_immediate_binary(offset if offset else '0', 12)
+
+        imm1 = imm[:7]
+        imm2 = imm[7:]
+
+        func3 = self.func3[instruction[0]]
+        binary = f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
+        return binary
