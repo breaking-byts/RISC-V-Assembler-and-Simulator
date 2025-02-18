@@ -1,3 +1,6 @@
+from fileinput import lineno
+
+
 class Assembler:
     def __init__(self):
         self.R_TYPE = 0
@@ -210,7 +213,7 @@ class Assembler:
             if reg in self.registers:
                 return self.registers[reg]
             else:
-                raise ValueError(f"Invalid register: {reg}")
+                raise ValueError( f "Invalid register: {reg}")
 
     def get_immediate_binary(self, imm_str, bits, signed=True):
             try:
@@ -242,122 +245,3 @@ class Assembler:
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 20, signed=True)
 
-    def I_type(self, instruction):
-        if len(instruction) != 3 and len(instruction) != 4:
-            raise SyntaxError(f"Invalid number of arguments for I-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rd = self.reg_to_binary(instruction[1])
-
-        if len(instruction) == 3:
-            mem_addr = instruction[2]
-            if '(' not in mem_addr or ')' not in mem_addr:
-                raise SyntaxError(f"Invalid memory address format: {mem_addr}")
-
-            offset = mem_addr[:mem_addr.find('(')]
-            rs1 = mem_addr[mem_addr.find('(') + 1:mem_addr.find(')')]
-            rs1 = self.reg_to_binary(rs1)
-            imm = self.get_immediate_binary(offset if offset else '0', 12)
-        else:
-            rs1 = self.reg_to_binary(instruction[2])
-            imm = self.get_immediate_binary(instruction[3], 12)
-
-        func3 = self.func3[instruction[0]]
-        binary = f"{imm}{rs1}{func3}{rd}{opcode}"
-        return binary
-    def R_type(self,instruction):
-            if len(instruction) != 4:
-                raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
-            opcode = self.opcodes[instruction[0]]
-            rd = self.reg_to_binary(instruction[1])
-            rs1 = self.reg_to_binary(instruction[2])
-            rs2 = self.reg_to_binary(instruction[3])
-            func3 = self.func3[instruction[0]]
-            if instruction[0] == 'sub':
-                func7 = '0100000'
-            else:
-                func7 = '0000000'
-            binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
-            return binary
-    def B_type(self, instruction):
-        if len(instruction) != 4:
-            raise SyntaxError(f"Invalid number of arguments for B-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rs1 = self.reg_to_binary(instruction[1])
-        rs2 = self.reg_to_binary(instruction[2])
-        func3 = self.func3[instruction[0]]
-
-        if instruction[3].startswith('0x') or instruction[3].isdigit() or instruction[3].startswith('-'):
-            imm = self.get_immediate_binary(instruction[3], 12)
-        else:
-            imm = self.get_branch_offset(instruction[3], self.current_address)
-
-        binary = f"{imm[0]}{imm[2:8]}{rs2}{rs1}{func3}{imm[8:12]}{imm[1]}{opcode}"
-        return binary
-    def J_type(self,instruction):
-        if len(instruction) != 3:
-            raise SyntaxError(f"Invalid number of arguments for J-type instruction: {instruction}")
-        opcode=self.opcodes[instruction[0]]
-        rd=self.reg_to_binary(instruction[1])
-        imm=self.get_jump_offset(instruction[2],0)
-        binary=f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
-        return binary
-    def U_type(self,instruction):
-        if len(instruction) != 3:
-            raise SyntaxError(f"Invalid number of arguments for U-type instruction: {instruction}")
-        opcode=self.opcodes[instruction[0]]
-        rd=self.reg_to_binary(instruction[1])
-        imm=self.get_immediate_binary(instruction[2],20)
-        binary=f"{imm}{rd}{opcode}"
-        return binary
-
-    def S_type(self, instruction):
-        if len(instruction) != 3:
-            raise SyntaxError(f"Invalid number of arguments for S-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rs2 = self.reg_to_binary(instruction[1])
-
-        mem_addr = instruction[2]
-        if '(' not in mem_addr or ')' not in mem_addr:
-            raise SyntaxError(f"Invalid memory address format: {mem_addr}")
-
-        offset = mem_addr[:mem_addr.find('(')]
-        rs1 = mem_addr[mem_addr.find('(') + 1:mem_addr.find(')')]
-        rs1 = self.reg_to_binary(rs1)
-        imm = self.get_immediate_binary(offset if offset else '0', 12)
-
-        imm1 = imm[:7]
-        imm2 = imm[7:]
-
-        func3 = self.func3[instruction[0]]
-        binary = f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
-        return binary
-
-
-def _test():
-    assembler = Assembler()
-    try:
-        instructions = assembler.text_parser('test.txt')
-        for instruction, address in instructions:
-            binary = None
-            if instruction[0] in ['add', 'sub', 'and', 'or', 'slt', 'srl']:
-                binary = assembler.R_type(instruction)
-            elif instruction[0] in ['addi', 'lw', 'jalr']:
-                binary = assembler.I_type(instruction)
-            elif instruction[0] == 'sw':
-                binary = assembler.S_type(instruction)
-            elif instruction[0] in ['beq', 'bne', 'blt']:
-                binary = assembler.B_type(instruction)
-            elif instruction[0] == 'jal':
-                binary = assembler.J_type(instruction)
-
-            if binary:
-                with open('output.txt', 'a') as f:
-                    f.write(f"{binary}\n")
-                print(f"Instruction: {instruction}")
-                print(f"Binary: {binary}")
-                print(f"Address: {address}\n")
-    except Exception as e:
-        print(f"Error: {e}")
-
-if __name__ == "__main__":
-    _test()
