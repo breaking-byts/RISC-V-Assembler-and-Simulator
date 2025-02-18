@@ -260,27 +260,35 @@ class Assembler:
             func3 = self.func3[instruction[0]]
             binary = f"{imm}{rs1}{func3}{rd}{opcode}"
             return binary
-        def R_type(self,instruction):
-            if len(instruction) != 4:
-                raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
-            opcode = self.opcodes[instruction[0]]
-            rd = self.reg_to_binary(instruction[1])
-            rs1 = self.reg_to_binary(instruction[2])
-            rs2 = self.reg_to_binary(instruction[3])
-            func3 = self.func3[instruction[0]]
-            if instruction[0] == 'sub':
-                func7 = '0100000'
-            else:
-                func7 = '0000000'
-            binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
-            return binary
+    def R_type(self,instruction):
+        if len(instruction) != 4:
+            raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
+        opcode = self.opcodes[instruction[0]]
+        rd = self.reg_to_binary(instruction[1])
+        rs1 = self.reg_to_binary(instruction[2])
+        rs2 = self.reg_to_binary(instruction[3])
+        func3 = self.func3[instruction[0]]
+        if instruction[0] == 'sub':
+            func7 = '0100000'
+        else:
+            func7 = '0000000'
+        binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
+        return binary
+
+    def J_type(self, instruction):
+        if len(instruction) != 3:
+            raise SyntaxError(f"Invalid number of arguments for J-type instruction: {instruction}")
+        opcode = self.opcodes[instruction[0]]
+        rd = self.reg_to_binary(instruction[1])
+        imm = self.get_jump_offset(instruction[2], 0)
+        binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+        return binary
 
     def S_type(self, instruction):
         if len(instruction) != 3:
             raise SyntaxError(f"Invalid number of arguments for S-type instruction: {instruction}")
         opcode = self.opcodes[instruction[0]]
         rs2 = self.reg_to_binary(instruction[1])
-
         mem_addr = instruction[2]
         if '(' not in mem_addr or ')' not in mem_addr:
             raise SyntaxError(f"Invalid memory address format: {mem_addr}")
