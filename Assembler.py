@@ -1,3 +1,6 @@
+from fileinput import lineno
+
+
 class Assembler:
     def __init__(self):
         self.R_TYPE = 0
@@ -24,7 +27,6 @@ class Assembler:
             'and':    '0110011',
             'lw':     '0000011',
             'jalr':   '1100111'
-
             }
         self.func3={
             'add': '000',
@@ -162,7 +164,8 @@ class Assembler:
                             continue
 
                     # Process instruction
-                    parts = line.split()
+                    a,b= line.split(" ")
+                    parts = [a]+b.split(",")
                     if not parts:
                         line_num += 1
                         continue
@@ -193,8 +196,8 @@ class Assembler:
                     self.current_address += 4
                     line_num += 1
 
-                if not has_halt:
-                    raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
+               #if not has_halt:
+                   # raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
 
                 return self.instructions
 
@@ -210,7 +213,7 @@ class Assembler:
             if reg in self.registers:
                 return self.registers[reg]
             else:
-                raise ValueError(f"Invalid register: {reg}")
+                raise ValueError( f "Invalid register: {reg}")
 
     def get_immediate_binary(self, imm_str, bits, signed=True):
             try:
@@ -241,69 +244,4 @@ class Assembler:
                 raise ValueError(f"Undefined label: {label}")
             offset = self.labels[label] - current_address
             return self.get_immediate_binary(str(offset), 20, signed=True)
-    def I_type(self,instruction):
-            if len(instruction) != 4:
-                raise SyntaxError(f"Invalid number of arguments for I-type instruction: {instruction}")
-            opcode = self.opcodes[instruction[0]]
-            rd= self.reg_to_binary(instruction[1])
-            rs1= self.reg_to_binary(instruction[2])
-            imm= self.get_immediate_binary(instruction[3], 12)
-            if "0x" in imm:
-                imm=self.get_immediate_binary(imm, 12)
-            else:
-                format
-                if '(' in imm and ')' in imm:
-                    offset = imm.split('(')[0]
-                    imm = self.get_immediate_binary(offset, 12)
-                else:
-                    imm = self.get_immediate_binary(imm, 12)
-            func3 = self.func3[instruction[0]]
-            binary = f"{imm}{rs1}{func3}{rd}{opcode}"
-            return binary
-    def R_type(self,instruction):
-        if len(instruction) != 4:
-            raise SyntaxError(f"Invalid number of arguments for R-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rd = self.reg_to_binary(instruction[1])
-        rs1 = self.reg_to_binary(instruction[2])
-        rs2 = self.reg_to_binary(instruction[3])
-        func3 = self.func3[instruction[0]]
-        if instruction[0] == 'sub':
-            func7 = '0100000'
-        else:
-            func7 = '0000000'
-        binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
-        return binary
-
-    def J_type(self, instruction):
-        if len(instruction) != 3:
-            raise SyntaxError(f"Invalid number of arguments for J-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rd = self.reg_to_binary(instruction[1])
-        imm = self.get_jump_offset(instruction[2], 0)
-        binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
-        return binary
-
-    def S_type(self, instruction):
-        if len(instruction) != 3:
-            raise SyntaxError(f"Invalid number of arguments for S-type instruction: {instruction}")
-        opcode = self.opcodes[instruction[0]]
-        rs2 = self.reg_to_binary(instruction[1])
-        mem_addr = instruction[2]
-        if '(' not in mem_addr or ')' not in mem_addr:
-            raise SyntaxError(f"Invalid memory address format: {mem_addr}")
-
-        offset = mem_addr[:mem_addr.find('(')]
-        rs1 = mem_addr[mem_addr.find('(') + 1:mem_addr.find(')')]
-        rs1 = self.reg_to_binary(rs1)
-        imm = self.get_immediate_binary(offset if offset else '0', 12)
-
-        imm1 = imm[:7]
-        imm2 = imm[7:]
-
-        func3 = self.func3[instruction[0]]
-        binary = f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
-        return binary
-
-
 
