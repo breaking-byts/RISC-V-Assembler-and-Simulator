@@ -265,3 +265,13 @@ class Assembler:
         func3 = self.func3[instruction[0]]
         binary = f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
         return binary
+
+    def J_type(self, instruction):
+        if len(instruction) != 3:
+            raise SyntaxError(f"Invalid number of arguments for J-type instruction: {instruction}")
+        opcode = self.opcodes[instruction[0]]
+        rd = self.reg_to_binary(instruction[1])
+        imm = self.get_jump_offset(instruction[2], 0)
+        binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+        return binary
+
