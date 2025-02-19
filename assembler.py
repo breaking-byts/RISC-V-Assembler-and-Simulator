@@ -339,13 +339,18 @@ class Assembler:
         rd = self.reg_to_binary(instruction[1])
 
         if instruction[2].startswith('0x') or instruction[2].isdigit() or instruction[2].startswith('-'):
-
             imm = self.get_immediate_binary(instruction[2], 20)
+
         else:
             imm = self.get_jump_offset(instruction[2], current_address)
-
-        binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
-        return binary
+            binary=f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+            return binary
+        if imm[0]=="1":
+            binary=f"{'1'}{imm[0]}{imm[10:19]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+            return binary
+        else:
+            binary = f"{"0"}{imm[0]}{imm[10:19]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+            return binary
 
     def U_type(self, instruction):
         if len(instruction) != 3:
@@ -375,8 +380,6 @@ class Assembler:
         func3 = self.func3[instruction[0]]
         binary = f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
         return binary
-
-
 def _test():
     assembler = Assembler()
     try:
