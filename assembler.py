@@ -147,6 +147,11 @@ class Assembler:
                     if ':' in line:
                         label_parts = line.split(':')
                         label = label_parts[0].strip()
+                        # Add these new validations
+                        if label in self.opcodes:
+                            raise SyntaxError(f"Line {line_num}: Label '{label}' cannot be an instruction name")
+                        if label in self.registers or label in self.abi_registers:
+                            raise SyntaxError(f"Line {line_num}: Label '{label}' cannot be a register name")
                         if not label[0].isalpha():
                             raise SyntaxError(f"Line {line_num}: Label must start with an alphabet")
                         if " " in label:
@@ -222,13 +227,15 @@ class Assembler:
     def get_branch_offset(self, label, current_address):
         if label not in self.labels:
             raise ValueError(f"Line {self.get_line_number()}: Undefined label: {label}")
-        offset = self.labels[label] - current_address
+        # Calculate offset in instructions (divide by 4 since each instruction is 4 bytes)
+        offset = (self.labels[label] - current_address) >> 2
         return self.get_immediate_binary(str(offset), 12, signed=True)
 
     def get_jump_offset(self, label, current_address):
         if label not in self.labels:
             raise ValueError(f"Line {self.get_line_number()}: Undefined label: {label}")
-        offset = self.labels[label] - current_address
+        # Calculate offset in instructions (divide by 4 since each instruction is 4 bytes)
+        offset = (self.labels[label] - current_address) >> 2
         return self.get_immediate_binary(str(offset), 20, signed=True)
 
     def I_type(self, instruction):
@@ -371,3 +378,4 @@ def _test():
 
 if __name__ == "__main__":
     _test()
+
