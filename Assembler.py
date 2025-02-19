@@ -239,7 +239,6 @@ class Assembler:
         # Converts an immediate value to its binary representation with specified bit width.
         # returns a binary representation of the immediate value
         # Raises a ValueError if immediate value is invalid or out of range
-
             try:
                 if '0x' in imm_str:
                     imm = int(imm_str, 16)
@@ -272,11 +271,10 @@ class Assembler:
             return self.get_immediate_binary(str(offset), 12, signed=True)
 
     def get_jump_offset(self, label, current_address):
-        #Calculates the jump offset for a given label relative to current address.
-        #Jump instructions use 20-bit signed offsets.
+        # Calculates the jump offset for a given label relative to current address.
+        # Jump instructions use 20-bit signed offsets.
         # returns 20-bit binary representation of the jump offset
         # raises ValueError if label is undefined
-
             if label not in self.labels:
                 raise ValueError(f"Undefined label: {label}")
             offset = self.labels[label] - current_address
