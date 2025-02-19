@@ -127,25 +127,34 @@ class Assembler:
         self.data_memory = [0] * 32
 
     def text_parser(self, file_name):
-        self.labels = {}
-        self.current_address = 0
-        self.instructions = []
-        has_halt = False
+
+        #Parses an assembly language text file and converts it into machine instructions.
+        #Returns:List of tuples containing parsed instructions and their addresses
+        # It raises errors such as
+        #    1)Filenotfounderror - if input file does not exist
+        #    2)IOError - if there is an error reading the file
+        #    3)SyntaxError - if there are syntax errors in assembly code
+
+
+        self.labels = {}   # Dictionary to store label names and their addresses
+        self.current_address = 0  # Tracks the current instruction address (increments by 4 each instruction)
+        self.instructions = []    # List to store parsed instructions
+        has_halt = False   # Flag to check if the program has a halt instruction
 
         try:
-            with open(file_name, 'r') as file:
+            with open(file_name, 'r') as file:  #opens and reads the assembly file
                 text = file.read()
                 lines = text.split('\n')
                 line_num = 1
 
-                for line in lines:
+                for line in lines: # processes each line in file
                     # Remove comments and whitespace
                     line = line.split('#')[0].strip()
                     if not line:
                         line_num += 1
                         continue
 
-                    # Handle labels
+                    # Handle labels containing ":"
                     if ':' in line:
                         label_parts = line.split(':')
                         label = label_parts[0].strip()
@@ -157,19 +166,23 @@ class Assembler:
                         if label in self.labels:
                             raise SyntaxError(f"Line {line_num}: Label {label} is duplicate")
 
-                        self.labels[label] = self.current_address
+                        self.labels[label] = self.current_address  #store label and its address
+
+                        # Get remainder of line after label (if any)
                         line = label_parts[1].strip()
-                        if not line:
+                        if not line:  # Skip if no instruction after label
                             line_num += 1
                             continue
 
-                    # Process instruction
+                    # Process instruction which splits instruction into opcode and operands
                     a,b= line.split(" ")
                     parts = [a]+b.split(",")
-                    if not parts:
+
+                    if not parts:      # Skip if no valid instruction parts
                         line_num += 1
                         continue
 
+                    # validate opcode
                     opcode = self.opcodes.get(parts[0])
                     if opcode is None:
                         raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
@@ -177,6 +190,7 @@ class Assembler:
                     if parts[0] == 'beq' and len(parts) == 4:
                         if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
                             has_halt = True
+                            # ensure that halt is the last instruction
                             if self.current_address != len(self.instructions) * 4:
                                 raise SyntaxError("Virtual Halt must be the last instruction")
 
@@ -184,14 +198,16 @@ class Assembler:
                     for reg in parts[1:]:
                         if reg in self.abi_registers:
                             continue
-                        if '0x' in reg:
+                        if '0x' in reg:  # check if its a hexadecimal immediate value
                             try:
                                 imm = int(reg, 16)
+                                # Validate immediate value is within valid range (-0x800 to 0x7FF)
                                 if imm > 0x7FF or imm < -0x800:
                                     raise SyntaxError(f"Line {line_num}: Immediate value out of range: {reg}")
                             except ValueError:
                                 raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
 
+                    # store instruction with its address
                     self.instructions.append((parts, self.current_address))
                     self.current_address += 4
                     line_num += 1
