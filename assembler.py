@@ -261,26 +261,51 @@ class Assembler:
                func7='0000000'
            binary=f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
            return binary
-   def B_type(self,instruction):
-       if len(instruction)!=4:
-           raise SyntaxError(f"Line {self.get_line_number()}: Invalid number of arguments for B-type instruction: {instruction}")
-       opcode=self.opcodes[instruction[0]]
-       rs1=self.reg_to_binary(instruction[1])
-       rs2=self.reg_to_binary(instruction[2])
-       func3=self.func3[instruction[0]]
+
+   def B_type(self, instruction):
+       if len(instruction) != 4:
+           raise SyntaxError(
+               f"Line {self.get_line_number()}: Invalid number of arguments for B-type instruction: {instruction}")
+       opcode = self.opcodes[instruction[0]]
+       rs1 = self.reg_to_binary(instruction[1])
+       rs2 = self.reg_to_binary(instruction[2])
+       func3 = self.func3[instruction[0]]
+
+       # Get the current instruction's address from self.instructions
+       current_instr_addr = None
+       for instr, addr, _ in self.instructions:
+           if instr == instruction:
+               current_instr_addr = addr
+               break
+
        if instruction[3].startswith('0x') or instruction[3].isdigit() or instruction[3].startswith('-'):
-           imm=self.get_immediate_binary(instruction[3],12)
+           imm = self.get_immediate_binary(instruction[3], 12)
        else:
-           imm=self.get_branch_offset(instruction[3],self.current_address)
-       binary=f"{imm[0]}{imm[2:8]}{rs2}{rs1}{func3}{imm[8:12]}{imm[1]}{opcode}"
+           imm = self.get_branch_offset(instruction[3], current_instr_addr)
+
+       binary = f"{imm[0]}{imm[2:8]}{rs2}{rs1}{func3}{imm[8:12]}{imm[1]}{opcode}"
        return binary
-   def J_type(self,instruction):
-       if len(instruction)!=3:
-           raise SyntaxError(f"Line {self.get_line_number()}: Invalid number of arguments for J-type instruction: {instruction}")
-       opcode=self.opcodes[instruction[0]]
-       rd=self.reg_to_binary(instruction[1])
-       imm=self.get_jump_offset(instruction[2],0)
-       binary=f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+
+   def J_type(self, instruction):
+       if len(instruction) != 3:
+           raise SyntaxError(
+               f"Line {self.get_line_number()}: Invalid number of arguments for J-type instruction: {instruction}")
+       opcode = self.opcodes[instruction[0]]
+       rd = self.reg_to_binary(instruction[1])
+
+       # Get the current instruction's address from self.instructions
+       current_instr_addr = None
+       for instr, addr, _ in self.instructions:
+           if instr == instruction:
+               current_instr_addr = addr
+               break
+
+       if instruction[2].startswith('0x') or instruction[2].isdigit() or instruction[2].startswith('-'):
+           imm = self.get_immediate_binary(instruction[2], 20)
+       else:
+           imm = self.get_jump_offset(instruction[2], current_instr_addr)
+
+       binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
        return binary
    def U_type(self,instruction):
        if len(instruction)!=3:
