@@ -180,7 +180,7 @@ class Assembler:
                     if instruction_parts[0] == 'beq' and len(instruction_parts) == 4:
                         if (instruction_parts[1] == 'zero' and
                             instruction_parts[2] == 'zero' and
-                            instruction_parts[3] == '0x00000000'):
+                            instruction_parts[3] == '0x00000000' or instruction_parts[3] == '0'):
                             has_halt = True
                             if self.current_address != len(self.instructions) * 4:
                                 raise SyntaxError("Virtual Halt must be the last instruction")
