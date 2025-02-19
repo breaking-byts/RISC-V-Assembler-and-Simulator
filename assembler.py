@@ -164,21 +164,28 @@ class Assembler:
                             line_num += 1
                             continue
                     # Process instruction
-                    a, b = line.split(" ")
-                    parts = [a] + b.split(",")
+                    parts = line.split(" ")
                     if not parts:
                         line_num += 1
                         continue
-                    opcode = self.opcodes.get(parts[0])
+                    opcode_name = parts[0]
+                    arguments_str = " ".join(parts[1:])
+                    arguments = [arg.strip() for arg in arguments_str.split(",") if arg.strip()]
+
+                    instruction_parts = [opcode_name] + arguments
+
+                    opcode = self.opcodes.get(instruction_parts[0])
                     if opcode is None:
-                        raise SyntaxError(f"Line {line_num}: Opcode {parts[0]} is invalid")
-                    if parts[0] == 'beq' and len(parts) == 4:
-                        if parts[1] == 'zero' and parts[2] == 'zero' and parts[3] == '0x00000000':
+                        raise SyntaxError(f"Line {line_num}: Opcode {instruction_parts[0]} is invalid")
+                    if instruction_parts[0] == 'beq' and len(instruction_parts) == 4:
+                        if (instruction_parts[1] == 'zero' and
+                            instruction_parts[2] == 'zero' and
+                            instruction_parts[3] == '0x00000000'):
                             has_halt = True
                             if self.current_address != len(self.instructions) * 4:
                                 raise SyntaxError("Virtual Halt must be the last instruction")
                     # Validate registers and immediates
-                    for reg in parts[1:]:
+                    for reg in instruction_parts[1:]:
                         if reg in self.abi_registers:
                             continue
                         if '0x' in reg:
@@ -189,11 +196,11 @@ class Assembler:
                             except ValueError:
                                 raise SyntaxError(f"Line {line_num}: Invalid immediate value: {reg}")
 
-                    self.instructions.append((parts, self.current_address, line_num))
+                    self.instructions.append((instruction_parts, self.current_address, line_num))
                     self.current_address += 4
                     line_num += 1
-                # if not has_halt:
-                # raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
+                if not has_halt:
+                    raise SyntaxError("Missing Virtual Halt instruction (beq zero,zero,0x00000000)")
                 return self.instructions
         except FileNotFoundError:
             raise FileNotFoundError(f"Assembly file not found: {file_name}")
@@ -210,32 +217,51 @@ class Assembler:
 
     def get_immediate_binary(self, imm_str, bits, signed=True):
         try:
-            if '0x' in imm_str:
+            if imm_str.lower().startswith("0x"):
                 imm = int(imm_str, 16)
             else:
-                imm = int(imm_str)
+                imm = int(imm_str, 0)
+
+            # If signed and the immediate is given in hex (or in any form)
+            # but represents a negative two's complement number, adjust it.
+            if signed and imm >= 2 ** (bits - 1):
+                imm = imm - 2 ** bits
+
             max_val = (2 ** (bits - 1)) - 1 if signed else (2 ** bits) - 1
             min_val = -(2 ** (bits - 1)) if signed else 0
             if imm > max_val or imm < min_val:
-                raise ValueError(f"Line {self.get_line_number()}: Immediate value {imm} out of range for {bits} bits")
-            if imm < 0:
-                imm = (2 ** bits) + imm
-            return format(imm % (2 ** bits), f'0{bits}b')
-        except ValueError:
-            raise ValueError(f"Line {self.get_line_number()}: Invalid immediate value: {imm_str}")
+                raise ValueError(
+                    f"Line {self.get_line_number()}: Immediate value {imm} out of range for {bits} bits"
+                )
+            # Use bit-masking to always get the two's complement representation.
+            return format(imm & ((1 << bits) - 1), f'0{bits}b')
+        except ValueError as e:
+            raise ValueError(
+                f"Line {self.get_line_number()}: Invalid immediate value: {imm_str}"
+            ) from e
 
     def get_branch_offset(self, label, current_address):
         if label not in self.labels:
             raise ValueError(f"Line {self.get_line_number()}: Undefined label: {label}")
-        # Calculate offset in instructions (divide by 4 since each instruction is 4 bytes)
-        offset = (self.labels[label] - current_address) >> 2
-        return self.get_immediate_binary(str(offset), 12, signed=True)
+        offset = self.labels[label] - current_address
+        if offset % 2 != 0:
+            raise ValueError(f"Line {self.get_line_number()}: Branch offset must be 2-byte aligned.")
+        offset = offset >> 1
+        imm = self.get_immediate_binary(str(offset), 12, signed=True)
+        imm_12 = imm[0]
+        imm_10_5 = imm[2:8]
+        imm_4_1 = imm[8:12]
+        imm_11 = imm[1]
+        return f"{imm_12}{imm_10_5}{imm_4_1}{imm_11}"
 
-    def get_jump_offset(self, label, current_address):
-        if label not in self.labels:
-            raise ValueError(f"Line {self.get_line_number()}: Undefined label: {label}")
-        # Calculate offset in instructions (divide by 4 since each instruction is 4 bytes)
-        offset = (self.labels[label] - current_address) >> 2
+    def get_jump_offset(self, target, current_address):
+        if target.strip().lstrip("-").isdigit():
+            offset = int(target)
+        else:
+            if target not in self.labels:
+                raise ValueError(f"Line {self.get_line_number()}: Undefined label: {target}")
+            # For labels, compute the byte offset and convert to halfword offset.
+            offset = (self.labels[target] - current_address) >> 1
         return self.get_immediate_binary(str(offset), 20, signed=True)
 
     def I_type(self, instruction):
@@ -275,7 +301,7 @@ class Assembler:
         binary = f"{func7}{rs2}{rs1}{func3}{rd}{opcode}"
         return binary
 
-    def B_type(self, instruction):
+    def B_type(self, instruction, current_address):
         if len(instruction) != 4:
             raise SyntaxError(
                 f"Line {self.get_line_number()}: Invalid number of arguments for B-type instruction: {instruction}")
@@ -284,39 +310,39 @@ class Assembler:
         rs2 = self.reg_to_binary(instruction[2])
         func3 = self.func3[instruction[0]]
 
-        # Get the current instruction's address from self.instructions
-        current_instr_addr = None
-        for instr, addr, _ in self.instructions:
-            if instr == instruction:
-                current_instr_addr = addr
-                break
-
-        if instruction[3].startswith('0x') or instruction[3].isdigit() or instruction[3].startswith('-'):
+        # Determine the immediate (branch offset) value.
+        if (instruction[3].startswith('0x') or instruction[3].isdigit()
+                or instruction[3].startswith('-')):
             imm = self.get_immediate_binary(instruction[3], 12)
         else:
-            imm = self.get_branch_offset(instruction[3], current_instr_addr)
+            imm = self.get_branch_offset(instruction[3], current_address)
 
-        binary = f"{imm[0]}{imm[2:8]}{rs2}{rs1}{func3}{imm[8:12]}{imm[1]}{opcode}"
+        # Rearrange the immediate bits for branch encoding:
+        # RISC-V branch encoding expects:
+        #   bit 31   : imm[12]  <- imm[0]
+        #   bits 30-25: imm[10:5] <- imm[1:7]
+        #   bits 11-8 : imm[4:1] <- imm[7:11]
+        #   bit 7    : imm[11]  <- imm[11]
+        imm_12 = imm[0]  # branch imm[12]
+        imm_10_5 = imm[1:7]  # branch imm[10:5]
+        imm_4_1 = imm[7:11]  # branch imm[4:1]
+        imm_11 = imm[11]  # branch imm[11]
+
+        binary = f"{imm_12}{imm_10_5}{rs2}{rs1}{func3}{imm_4_1}{imm_11}{opcode}"
         return binary
 
-    def J_type(self, instruction):
+    def J_type(self, instruction, current_address):
         if len(instruction) != 3:
             raise SyntaxError(
                 f"Line {self.get_line_number()}: Invalid number of arguments for J-type instruction: {instruction}")
         opcode = self.opcodes[instruction[0]]
         rd = self.reg_to_binary(instruction[1])
 
-        # Get the current instruction's address from self.instructions
-        current_instr_addr = None
-        for instr, addr, _ in self.instructions:
-            if instr == instruction:
-                current_instr_addr = addr
-                break
-
         if instruction[2].startswith('0x') or instruction[2].isdigit() or instruction[2].startswith('-'):
+
             imm = self.get_immediate_binary(instruction[2], 20)
         else:
-            imm = self.get_jump_offset(instruction[2], current_instr_addr)
+            imm = self.get_jump_offset(instruction[2], current_address)
 
         binary = f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
         return binary
@@ -354,28 +380,28 @@ class Assembler:
 def _test():
     assembler = Assembler()
     try:
-        instructions = assembler.text_parser('test.txt')
-        for instruction, _, line_num in instructions:
-            assembler.current_line = line_num
-            binary = None
-            if instruction[0] in ['add', 'sub', 'and', 'or', 'slt', 'srl']:
-                binary = assembler.R_type(instruction)
-            elif instruction[0] in ['addi', 'lw', 'jalr']:
-                binary = assembler.I_type(instruction)
-            elif instruction[0] == 'sw':
-                binary = assembler.S_type(instruction)
-            elif instruction[0] in ['beq', 'bne', 'blt']:
-                binary = assembler.B_type(instruction)
-            elif instruction[0] == 'jal':
-                binary = assembler.J_type(instruction)
-            if binary:
-                with open('output.txt', 'a') as f:
+        instructions_with_address = assembler.text_parser('test.txt')
+        with open('output.txt', 'w') as f:  # Open in write mode to clear previous output
+            for instruction_data in instructions_with_address:
+                instruction, address, line_num = instruction_data
+                assembler.current_line = line_num
+                binary = None
+                if instruction[0] in ['add', 'sub', 'and', 'or', 'slt', 'srl']:
+                    binary = assembler.R_type(instruction)
+                elif instruction[0] in ['addi', 'lw', 'jalr']:
+                    binary = assembler.I_type(instruction)
+                elif instruction[0] == 'sw':
+                    binary = assembler.S_type(instruction)
+                elif instruction[0] in ['beq', 'bne', 'blt']:
+                    binary = assembler.B_type(instruction, address)
+                elif instruction[0] == 'jal':
+                    binary = assembler.J_type(instruction, address)
+                if binary:
                     f.write(f"{binary}\n")
-                print(f"{binary}")
+                    print(f"{binary}")
     except Exception as e:
         print(f"Error: {e}")
 
 
 if __name__ == "__main__":
     _test()
-
