@@ -1,3 +1,4 @@
+import sys
 class Assembler:
    def __init__(self):
        self.opcodes={
@@ -351,11 +352,11 @@ class Assembler:
        binary=f"{imm1}{rs2}{rs1}{func3}{imm2}{opcode}"
        return binary
    
-def _test(filename):
+def _test(filename,output):
    assembler=Assembler()
    try:
        instructions_with_address=assembler.text_parser(filename)
-       with open('output.txt','w') as f:  # Open in write mode to clear previous output
+       with open(output,'w') as f:  # Open in write mode to clear previous output
            for instruction_data in instructions_with_address:
                instruction,address,line_num=instruction_data
                assembler.current_line=line_num
@@ -377,23 +378,6 @@ def _test(filename):
        print(f"Error: {e}")
 
 if __name__=="__main__":
-    for i in range(0,11,1):
-        if i==3:
-            continue
-        else:
-            _test(f"Ex_test_{i}.txt")
-            p=[]
-            k=[]
-            with open('output.txt','r') as f:
-                for line in f:
-                    p.append(line)
-            with open(f'Ex_test_{i}1.txt','r') as f:
-                for line in f:
-                    k.append(line)
-            for i in range(0,len(p)-1,1):
-                if p[i]==k[i]:
-                    print("Test Passed")
-                else:
-                    print("Test Failed")
+    _test(sys.argv[1],sys.argv[2])
 
             
