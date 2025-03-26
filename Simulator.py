@@ -32,8 +32,14 @@ class CPU:
     def decode(self,instruction):
         opcode=instruction & 0x7F;
         return opcode;
+    def sign_extend(value, bits):
+        if value & (1 << (bits - 1)):
+            value -= 1 << bits
+        return value
+
     def execute(self,opcode,instruction):
         if opcode==0x33:
+            #R TYPE
               rd=(instruction>>7)&0x1F;
               func3=(instruction>>12)&0x7;
               rs1=(instruction>>15)&0x1F;
@@ -56,34 +62,95 @@ class CPU:
               elif func3==0b111:
                     self.registers[rd]=self.registers[rs1]&self.registers[rs2];
         elif (opcode==0b0000011 or opcode==0b0010011 or opcode==0b1100111):
+            #I type
             rd=(instruction>>7)&0x1F;
             func3=(instruction>>12)&0x7;
             rs1=(instruction>>15)&0x1F;
-            imm=(instruction>>20);
-            if opcode==0b0000011:
+            imm= self.sign_extend(instruction >> 20, 12)
+            if opcode==0b0000011:#
                 if func3==0b010:
-                    self.registers[rd]=self.memory.read(self.registers[rs1]+imm);
+                    addr = self.registers[rs1] + imm
+                    self.registers[rd] = self.memory.read(addr)
             elif opcode==0b0010011:
                 if func3==0b000:
                     self.registers[rd]=self.registers[rs1]+imm;
             elif opcode==0b1100111:
                 if func3==0b000:
-                    self.registers[rd]=self.pc+imm;
-        elif opcode==0b1000011:
+                    next_pc = self.pc
+                    self.pc = (self.registers[rs1] + imm) & ~1
+                    self.registers[rd] = next_pc
+        elif opcode==0b0100011:
             #S type
-            func3=(instruction>>12)&0x7;
-            rs1=(instruction>>15)&0x1F;
-            rs2=(instruction>>20)&0x1F;
-            imm=(instruction>>25);
-            if func3==0b010:
-                self.memory.write(self.registers[rs1]+imm,self.registers[rs2]);
+            func3 = (instruction >> 12) & 0x7
+            rs1 = (instruction >> 15) & 0x1F
+            rs2 = (instruction >> 20) & 0x1F
+            imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F)
+            imm = self.sign_extend(imm, 12)
+            if func3 == 0b010:  # SW
+                addr = self.registers[rs1] + imm
+                self.memory.write(addr, self.registers[rs2])
         elif opcode==0b1100011:
             #B type
+            func3 = (instruction >> 12) & 0x7
+            rs1 = (instruction >> 15) & 0x1F
+            rs2 = (instruction >> 20) & 0x1F
+            # Immediate for branch instructions:
+            imm = (((instruction >> 31) & 0x1) << 12) | \
+                  (((instruction >> 25) & 0x3F) << 5) | \
+                  (((instruction >> 8) & 0xF) << 1) | \
+                  (((instruction >> 7) & 0x1) << 11)
+            imm = self.sign_extend(imm, 13)
 
+            if func3 == 0b000:  # BEQ
+                if self.registers[rs1] == self.registers[rs2]:
+                                 self.pc = self.pc - 4 + imm
+            elif func3 == 0b001:  # BNE
+                if self.registers[rs1] != self.registers[rs2]:
+                                  self.pc = self.pc - 4 + imm
+            elif func3 == 0b100:  # BLT
+                if self.registers[rs1] < self.registers[rs2]:
+                                 self.pc = self.pc - 4 + imm;
 
         elif opcode==0b1101111:
-            imm=(instruction>>20);
-            self.memory.write(self.registers[rs1]+imm,self.registers[rs2]);
+            #J TYPE
+            rd = (instruction >> 7) & 0x1F
+            # Immediate for JAL:
+            imm = (((instruction >> 31) & 0x1) << 20) | \
+                  (((instruction >> 21) & 0x3FF) << 1) | \
+                  (((instruction >> 20) & 0x1) << 11) | \
+                  (((instruction >> 12) & 0xFF) << 12)
+            imm = self.sign_extend(imm, 21)
+            next_pc = self.pc
+            self.registers[rd] = next_pc
+            self.pc = self.pc - 4 + imm
+    def print_trace(self, file_handle):
+        line = f"{self.pc}"
+        for reg in self.registers:
+            line += " " + f"{reg}"
+        file_handle.write(line + "\n")
+
+    def run(self, trace_filename="trace.txt"):
+        with open(trace_filename, "w") as f:
+            header = "PC"
+            for i in range(32):
+                header += " x" + str(i)
+            f.write(header + "\n")
+            while self.running:
+                try:
+                    instruction = self.fetch()
+                except Exception as e:
+                    self.running = False
+                    break
+                opcode = self.decode(instruction)
+                self.execute(opcode, instruction)
+                self.print_trace(f)
+            f.write("Data Memory\n")
+            for addr in range(0x00010000, 0x00010080, 4):
+                try:
+                    word = self.memory.read(addr)
+                except Exception:
+                    word = 0
+                f.write(f"0x{addr:08X}:{word}\n")
 
 
 
