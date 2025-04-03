@@ -125,29 +125,38 @@ class CPU:
 
             if taken:
                 self.pc = current_pc + I'm
+# J-type (jump)
+        elif opcode == "1101111":  # JAL (Jump and Link)
+            rd = int(i_str[20:25], 2)
+            imm_j = i_str[0] + i_str[12:20] + i_str[11] + i_str[1:11] + "0"
+            imm = self.sign_extend(imm_j, 21)
+            current_pc = self.pc - 4
+            next_pc_val = self.pc
+            self.pc = current_pc + imm
+            if rd != 0:
+                self.regs[rd] = next_pc_val & 0xFFFFFFFF
 
+class Memory:
+    def init(self, size):  # Initialize memory with a given size
+        self.size = size
+        self.memory = bytearray(size)
 
+    def load_binaryprogram(self, program, start=0):  # Load a binary program
+        self.memory[start:start + len(program)] = program
 
+    def read(self, address):  # Read a 4-byte word from memory
+        return int.from_bytes(self.memory[address:address + 4], "little", signed=False)
 
+    def write(self, address, data):  # Write a 4-byte word to memory
+        self.memory[address:address + 4] = data.to_bytes(4, "little", signed=False)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def dec_to_bin(num):  # Convert decimal to binary (32-bit)
+    mask = 1 << 31
+    result = ""
+    for _ in range(32):
+        result += "1" if num & mask else "0"
+        mask //= 2
+    return int(result, 2)
 def simulate(instructions):  # Main simulation function
     cpu = CPU()
     cpu.memory = Memory(1024 * 128)  # Initialize memory (128KB)
