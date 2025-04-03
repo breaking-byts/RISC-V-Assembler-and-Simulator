@@ -1,6 +1,6 @@
 import sys
 class CPU:
-    def init(self): 
+    def __init__(self): 
         self.regs = [0] * 32  # Register file (32 registers)
         self.regs[2] = 380
         self.pc = 0  # Program counter
@@ -138,7 +138,7 @@ class CPU:
                 self.regs[rd] = next_pc_val & 0xFFFFFFFF
 
 class Memory:
-    def init(self, size):  # Initialize memory with a given size
+    def __init__(self, size):  # Initialize memory with a given size
         self.size = size
         self.memory = bytearray(size)
 
