@@ -1,9 +1,10 @@
+import sys
 class CPU:
     def init(self): 
         self.regs = [0] * 32  # Register file (32 registers)
-        self.regs[2] = 380  # Stack pointer
+        self.regs[2] = 380
         self.pc = 0  # Program counter
-        self.memory = None  # Memory reference
+        self.memory = None 
         self.running = True  # Execution status
 
     def fetch(self):  # Fetch instruction from memory
