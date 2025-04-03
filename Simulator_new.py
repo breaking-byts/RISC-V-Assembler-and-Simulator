@@ -75,4 +75,58 @@
                 taken = (val1 != val2)
 
             if taken:
-                self.pc = current_pc + imm
+                self.pc = current_pc + I'm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def simulate(instructions):  # Main simulation function
+    cpu = CPU()
+    cpu.memory = Memory(1024 * 128)  # Initialize memory (128KB)
+    program_bytes = bytearray()
+
+    for instr in instructions:  # Convert instructions to bytes
+        program_bytes.extend(instr.to_bytes(4, 'little', signed=False))
+    
+    cpu.memory.load_binaryprogram(program_bytes)
+
+    max_cycles = 1000
+    cycles = 0
+
+    with open(sys.argv[2], "w") as f:  # Write execution trace
+        while cpu.running and cycles < max_cycles:
+            instruction = cpu.fetch()
+            opcode = cpu.decode(instruction)
+            cpu.execute(opcode, instruction)
+
+            # Write state to file
+            f.write(f"0b{cpu.pc:032b} ")
+            for i in cpu.regs:
+                f.write(f"0b{i:032b} ")
+            f.write("\n")
+
+            cycles += 1
+
+# Read binary instructions from file and run simulation
+with open(sys.argv[1], "r") as f:
+    instructions = [int(line, 2) for line in f]
+simulate(instructions)
