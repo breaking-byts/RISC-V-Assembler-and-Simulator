@@ -1,22 +1,70 @@
+class CPU:
+    def init(self): 
+        self.regs = [0] * 32  # Register file (32 registers)
+        self.regs[2] = 380  # Stack pointer
+        self.pc = 0  # Program counter
+        self.memory = None  # Memory reference
+        self.running = True  # Execution status
 
+    def fetch(self):  # Fetch instruction from memory
+        instruction = self.memory.read(self.pc)
+        self.pc += 4  # Move to next instruction
+        return instruction
 
+    def decode(self, instruction):  # Decode instruction to get the opcode
+        if instruction is None:
+            return None
+        opcode = f"{instruction:032b}"
+        return opcode[-7:]  # Extract the last 7 bits (opcode)
 
+    def sign_extend(self, value, bits):  # Sign-extend immediate values
+        num = int(value, 2)
+        sign_bit = 1 << (bits - 1)
+        if (num & sign_bit) != 0:
+            num -= (1 << bits)
+        return num
 
+    def execute(self, opcode, instruction):  # Execute instruction based on opcode
+        if opcode is None or instruction is None:
+            self.running = False
+            return
 
+        # Halt execution on special halt instruction
+        if instruction == 0b00000000000000000000000001100011:
+            self.running = False
+            self.pc -= 4
+            return
 
+        i_str = f"{instruction:032b}"
 
+        # R-type instructions (register operations)
+        if opcode == "0110011":
+            rd = int(i_str[20:25], 2)
+            func3 = i_str[17:20]
+            rs1 = int(i_str[12:17], 2)
+            rs2 = int(i_str[7:12], 2)
+            func7 = i_str[0:7]
+            val1 = self.regs[rs1]
+            val2 = self.regs[rs2]
+            result = 0
 
+            if func3 == "000":
+                if func7 == "0000000":  # ADD
+                    result = val1 + val2
+                elif func7 == "0100000":  # SUB
+                    result = val1 - val2
+            elif func3 == "001":  # SLL (Shift Left Logical)
+                shift_amount = val2 & 0b11111
+                result = val1 << shift_amount
+            elif func3 == "010":  # SLT (Set Less Than)
+                result = 1 if val1 < val2 else 0
+            elif func3 == "110":  # OR
+                result = val1 | val2
+            elif func3 == "111":  # AND
+                result = val1 & val2
 
-
-
-
-
-
-
-
-
-
-
+            if rd != 0:  # Do not modify register 0
+                self.regs[rd] = result & 0xFFFFFFFF
 # I-type instructions (immediate and load)
         elif opcode in ["0000011", "0010011", "1100111"]:
             rd = int(i_str[20:25], 2)
