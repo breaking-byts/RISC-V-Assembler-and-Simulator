@@ -65,7 +65,8 @@ class CPU:
 
             if rd != 0:  # Do not modify register 0
                 self.regs[rd] = result & 0xFFFFFFFF
-# I-type instructions (immediate and load)
+
+        # I-type instructions (immediate and load)
         elif opcode in ["0000011", "0010011", "1100111"]:
             rd = int(i_str[20:25], 2)
             func3 = i_str[17:20]
